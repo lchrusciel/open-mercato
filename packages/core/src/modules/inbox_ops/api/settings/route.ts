@@ -43,6 +43,8 @@ export async function GET(req: Request) {
       ctx.scope,
     )
 
+    const expectedDomain = process.env.INBOX_OPS_DOMAIN || 'inbox.mercato.local'
+
     const responseBody = {
       settings: settings ? {
         id: settings.id,
@@ -50,6 +52,7 @@ export async function GET(req: Request) {
         isActive: settings.isActive,
         workingLanguage: settings.workingLanguage,
       } : null,
+      expectedDomain,
     }
 
     if (cache) {
@@ -101,6 +104,9 @@ export async function PATCH(req: Request) {
     }
     if (parsed.data.isActive !== undefined) {
       settings.isActive = parsed.data.isActive
+    }
+    if (parsed.data.inboxAddress !== undefined) {
+      settings.inboxAddress = parsed.data.inboxAddress
     }
 
     await ctx.em.flush()
