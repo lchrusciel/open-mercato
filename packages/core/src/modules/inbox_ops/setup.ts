@@ -41,7 +41,25 @@ export const setup: ModuleSetupConfig = {
     await em.flush()
   },
 
-  async seedDefaults() {},
+  async seedDefaults({ em, tenantId, organizationId }) {
+    const settings = await findOneWithDecryption(
+      em,
+      InboxSettings,
+      { tenantId, organizationId, deletedAt: null },
+      undefined,
+      { tenantId, organizationId },
+    )
+    if (settings) {
+      const expectedDomain = process.env.INBOX_OPS_DOMAIN || 'inbox.mercato.local'
+      const currentDomain = settings.inboxAddress.split('@')[1]
+      if (currentDomain !== expectedDomain) {
+        console.warn(
+          `[inbox_ops] Domain mismatch: inbox_settings uses "${currentDomain}" but INBOX_OPS_DOMAIN is "${expectedDomain}". ` +
+          `Update the domain from the Inbox Settings page or set the env var back to "${currentDomain}".`,
+        )
+      }
+    }
+  },
 }
 
 export default setup
