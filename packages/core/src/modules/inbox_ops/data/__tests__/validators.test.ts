@@ -11,6 +11,7 @@ import {
   extractionOutputSchema,
   proposalListQuerySchema,
   validateActionPayloadForType,
+  updateSettingsSchema,
 } from '../validators'
 
 describe('orderPayloadSchema', () => {
@@ -493,6 +494,60 @@ describe('validateActionPayloadForType', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error).toContain('create_contact')
+    }
+  })
+})
+
+describe('updateSettingsSchema', () => {
+  it('accepts workingLanguage only', () => {
+    const result = updateSettingsSchema.safeParse({ workingLanguage: 'de' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts isActive only', () => {
+    const result = updateSettingsSchema.safeParse({ isActive: false })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts inboxAddress only', () => {
+    const result = updateSettingsSchema.safeParse({ inboxAddress: 'ops-12345678@newdomain.com' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts all fields together', () => {
+    const result = updateSettingsSchema.safeParse({
+      workingLanguage: 'pl',
+      isActive: true,
+      inboxAddress: 'ops-12345678@newdomain.com',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts empty object (all fields optional)', () => {
+    const result = updateSettingsSchema.safeParse({})
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid email in inboxAddress', () => {
+    const result = updateSettingsSchema.safeParse({ inboxAddress: 'not-an-email' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects inboxAddress that is too short', () => {
+    const result = updateSettingsSchema.safeParse({ inboxAddress: 'a@b' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid workingLanguage', () => {
+    const result = updateSettingsSchema.safeParse({ workingLanguage: 'fr' })
+    expect(result.success).toBe(false)
+  })
+
+  it('trims whitespace from inboxAddress', () => {
+    const result = updateSettingsSchema.safeParse({ inboxAddress: '  ops-12345678@newdomain.com  ' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.inboxAddress).toBe('ops-12345678@newdomain.com')
     }
   })
 })

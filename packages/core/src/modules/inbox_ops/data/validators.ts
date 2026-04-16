@@ -254,6 +254,7 @@ export const translateProposalSchema = z.object({
 export const updateSettingsSchema = z.object({
   workingLanguage: z.enum(['en', 'de', 'es', 'pl']).optional(),
   isActive: z.boolean().optional(),
+  inboxAddress: z.string().trim().min(5).max(320).email().optional(),
 })
 
 // ---------------------------------------------------------------------------
