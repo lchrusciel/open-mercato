@@ -28,6 +28,8 @@ export default function InboxSettingsPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [isSavingLanguage, setIsSavingLanguage] = React.useState(false)
+  const [expectedDomain, setExpectedDomain] = React.useState<string | null>(null)
+  const [isUpdatingDomain, setIsUpdatingDomain] = React.useState(false)
 
   React.useEffect(() => {
     let cancelled = false
@@ -35,10 +37,13 @@ export default function InboxSettingsPage() {
       setIsLoading(true)
       setError(null)
       try {
-        const result = await apiCall<{ settings: { inboxAddress?: string; isActive?: boolean; workingLanguage?: string } | null }>('/api/inbox_ops/settings')
+        const result = await apiCall<{ settings: { inboxAddress?: string; isActive?: boolean; workingLanguage?: string } | null; expectedDomain?: string }>('/api/inbox_ops/settings')
         if (!cancelled) {
           if (result?.ok && result.result?.settings) {
             setSettings(result.result.settings)
+            if (result.result.expectedDomain) {
+              setExpectedDomain(result.result.expectedDomain)
+            }
           } else {
             setError(t('inbox_ops.settings.load_failed', 'Failed to load settings'))
           }
@@ -60,6 +65,30 @@ export default function InboxSettingsPage() {
       setTimeout(() => setCopied(false), 2000)
     }
   }, [settings])
+
+  const currentDomain = settings?.inboxAddress?.split('@')[1] ?? null
+  const hasDomainMismatch = Boolean(expectedDomain && currentDomain && currentDomain !== expectedDomain)
+
+  const handleUpdateDomain = React.useCallback(async () => {
+    if (!settings?.inboxAddress || !expectedDomain) return
+    const localPart = settings.inboxAddress.split('@')[0]
+    const newAddress = `${localPart}@${expectedDomain}`
+    setIsUpdatingDomain(true)
+    const result = await runMutation({
+      operation: () => apiCall<{ ok: boolean; settings: { inboxAddress: string } }>('/api/inbox_ops/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ inboxAddress: newAddress }),
+      }),
+      context: {},
+    })
+    if (result?.ok && result.result?.ok) {
+      setSettings((prev) => prev ? { ...prev, inboxAddress: result.result!.settings.inboxAddress } : prev)
+      flash(t('inbox_ops.settings.domain_updated', 'Inbox domain updated'), 'success')
+    } else {
+      flash(t('inbox_ops.settings.domain_update_failed', 'Failed to update inbox domain'), 'error')
+    }
+    setIsUpdatingDomain(false)
+  }, [settings, expectedDomain, t, runMutation])
 
   const handleLanguageChange = React.useCallback(async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const workingLanguage = event.target.value
@@ -97,6 +126,31 @@ export default function InboxSettingsPage() {
             <ErrorMessage label={error} />
           ) : settings ? (
             <div className="space-y-6">
+              {hasDomainMismatch && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    {t('inbox_ops.settings.domain_mismatch_title', 'Inbox domain mismatch')}
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                    {t(
+                      'inbox_ops.settings.domain_mismatch_description' as never,
+                      `Your inbox address uses "${currentDomain}" but INBOX_OPS_DOMAIN is set to "${expectedDomain}". Emails will not be received until this is corrected.`,
+                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={handleUpdateDomain}
+                    disabled={isUpdatingDomain}
+                  >
+                    {isUpdatingDomain
+                      ? t('inbox_ops.settings.updating_domain', 'Updating...')
+                      : t('inbox_ops.settings.update_domain', 'Update domain')}
+                  </Button>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-foreground">
                   {t('inbox_ops.settings.forwarding_address', 'Forwarding Address')}
